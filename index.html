@@ -1,0 +1,1424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Floor Plan 3D Visualizer - Enhanced with Thresholds</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f1419;
+            min-height: 100vh;
+            display: flex;
+            color: #fff;
+        }
+
+        /* Main Layout */
+        .main-wrapper {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+            gap: 0;
+        }
+
+        /* 2D Section - Left Sidebar */
+        .section-2d {
+            width: 320px;
+            background: #1a1f26;
+            padding: 20px;
+            overflow-y: auto;
+            border-right: 1px solid #2a3f5f;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .section-2d h2 {
+            font-size: 18px;
+            color: #3b82f6;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .upload-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .upload-btn:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .upload-btn:disabled { 
+            background: #444;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #fileInput { display: none; }
+
+        /* Threshold Controls Section */
+        .threshold-section {
+            background: #252d38;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #2a3f5f;
+        }
+
+        .threshold-section h3 {
+            font-size: 13px;
+            color: #10b981;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .threshold-control {
+            margin-bottom: 12px;
+        }
+
+        .threshold-label {
+            font-size: 11px;
+            color: #888;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .threshold-value {
+            color: #3b82f6;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 5px;
+            border-radius: 3px;
+            background: #2a3f5f;
+            outline: none;
+            -webkit-appearance: none;
+            accent-color: #3b82f6;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+        }
+
+        .reprocess-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .reprocess-btn:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+
+        .reprocess-btn:disabled {
+            background: #444;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .canvas-2d-container {
+            background: #0f1419;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #2a3f5f;
+            aspect-ratio: 1;
+        }
+
+        #canvas2d {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: #0f1419;
+        }
+
+        .image-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .btn-secondary {
+            background: #2a3f5f;
+            color: white;
+            border: 1px solid #3a5f8f;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-secondary:hover {
+            background: #3a5f8f;
+            border-color: #4a7faf;
+        }
+
+        .btn-secondary:disabled {
+            background: #444;
+            color: #888;
+            cursor: not-allowed;
+            border-color: #333;
+        }
+
+        .legend {
+            background: #252d38;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #2a3f5f;
+        }
+
+        .legend h3 {
+            font-size: 13px;
+            color: #10b981;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .legend-items {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+
+        .status {
+            font-size: 12px;
+            padding: 8px;
+            border-radius: 6px;
+            text-align: center;
+            background: #252d38;
+            min-height: 20px;
+        }
+
+        .status.loading {
+            color: #3b82f6;
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .status.success {
+            color: #10b981;
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .status.error {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        /* 3D Section - Main Canvas */
+        .section-3d {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #0f1419;
+            position: relative;
+        }
+
+        .canvas-3d-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0f1419 0%, #1a1f26 100%);
+        }
+
+        #canvas3d {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Control Panels */
+        .control-panel-top {
+            background: rgba(26, 31, 38, 0.95);
+            border-bottom: 1px solid #2a3f5f;
+            padding: 12px 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            font-size: 13px;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .control-group label {
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .preset-views {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .preset-btn {
+            background: #2a3f5f;
+            color: white;
+            border: 1px solid #3a5f8f;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .preset-btn:hover {
+            background: #3a5f8f;
+            border-color: #4a7faf;
+        }
+
+        .preset-btn.active {
+            background: #3b82f6;
+            border-color: #2563eb;
+            box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .angle-display {
+            background: #252d38;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #10b981;
+            border: 1px solid #2a3f5f;
+        }
+
+        .control-panel-right {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            background: rgba(26, 31, 38, 0.95);
+            border: 1px solid #2a3f5f;
+            border-radius: 8px;
+            padding: 15px;
+            width: 240px;
+            max-height: calc(100vh - 120px);
+            overflow-y: auto;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .panel-section {
+            margin-bottom: 15px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #2a3f5f;
+        }
+
+        .panel-section:last-child {
+            margin-bottom: 0;
+            border-bottom: none;
+        }
+
+        .panel-section h3 {
+            font-size: 12px;
+            color: #3b82f6;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .control-row label {
+            color: #aaa;
+        }
+
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .slider-label {
+            font-size: 11px;
+            color: #888;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .color-picker-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .color-picker-row label {
+            font-size: 11px;
+            color: #aaa;
+            flex: 1;
+        }
+
+        input[type="color"] {
+            width: 30px;
+            height: 28px;
+            border: 1px solid #2a3f5f;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .toggle-btn {
+            background: #2a3f5f;
+            color: white;
+            border: 1px solid #3a5f8f;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+            margin-bottom: 4px;
+        }
+
+        .toggle-btn:hover {
+            background: #3a5f8f;
+        }
+
+        .toggle-btn.active {
+            background: #10b981;
+            border-color: #059669;
+        }
+
+        .object-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .stat-box {
+            background: #252d38;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #2a3f5f;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: #3b82f6;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: #888;
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        .control-panel-bottom {
+            background: rgba(26, 31, 38, 0.95);
+            border-top: 1px solid #2a3f5f;
+            padding: 12px 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            background: #444;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .info-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(26, 31, 38, 0.95);
+            border: 1px solid #2a3f5f;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 12px;
+            max-width: 250px;
+            z-index: 50;
+            backdrop-filter: blur(10px);
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 4px;
+        }
+
+        .info-label {
+            color: #888;
+        }
+
+        .info-value {
+            color: #10b981;
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1a1f26;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #2a3f5f;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3a5f8f;
+        }
+
+        .help-tooltip {
+            font-size: 11px;
+            color: #888;
+            margin-top: 4px;
+            line-height: 1.3;
+            padding: 4px;
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 2px solid #3b82f6;
+            padding-left: 8px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .section-2d {
+                width: 280px;
+            }
+
+            .control-panel-right {
+                width: 200px;
+                font-size: 11px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-wrapper {
+                flex-direction: column;
+            }
+
+            .section-2d {
+                width: 100%;
+                max-height: 300px;
+                border-right: none;
+                border-bottom: 1px solid #2a3f5f;
+                padding: 15px;
+            }
+
+            .control-panel-right {
+                display: none;
+            }
+
+            .control-panel-top {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-wrapper">
+        <!-- 2D Section -->
+        <div class="section-2d">
+            <div>
+                <h2>Floor Plan</h2>
+                <div class="upload-section">
+                    <input type="file" id="fileInput" accept="image/*">
+                    <button class="upload-btn" id="uploadBtn">📁 Upload Image</button>
+                </div>
+            </div>
+
+            <!-- Threshold Controls -->
+            <div class="threshold-section">
+                <h3>🎯 Detection Settings</h3>
+                <div class="threshold-control">
+                    <div class="threshold-label">
+                        <span>Confidence Threshold</span>
+                        <span class="threshold-value" id="confidenceValue">0.70</span>
+                    </div>
+                    <input type="range" id="confidenceSlider" min="0.1" max="0.99" step="0.01" value="0.70">
+                </div>
+                <div class="threshold-control">
+                    <div class="threshold-label">
+                        <span>Detection Threshold</span>
+                        <span class="threshold-value" id="detectionValue">0.50</span>
+                    </div>
+                    <input type="range" id="detectionSlider" min="0.1" max="0.99" step="0.01" value="0.50">
+                </div>
+                <button class="reprocess-btn" id="reprocessBtn" disabled>🔄 Reprocess Image</button>
+                <div class="help-tooltip">
+                    💡 Higher thresholds = fewer but more accurate detections
+                </div>
+            </div>
+
+            <div class="canvas-2d-container">
+                <canvas id="canvas2d"></canvas>
+                <div class="image-placeholder" id="placeholder">No image<br>uploaded yet</div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn-secondary" id="copyBtn" disabled>📋 Copy</button>
+                <button class="btn-secondary" id="downloadBtn" disabled>⬇️ Download</button>
+            </div>
+
+            <div class="legend">
+                <h3>Detected Objects</h3>
+                <div class="legend-items">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #3b82f6;"></div>
+                        <span>Wall</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ef4444;"></div>
+                        <span>Door</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #10b981;"></div>
+                        <span>Window</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status" id="status"></div>
+        </div>
+
+        <!-- 3D Section -->
+        <div class="section-3d">
+            <!-- Top Controls -->
+            <div class="control-panel-top">
+                <div class="control-group">
+                    <label>Views:</label>
+                    <div class="preset-views">
+                        <button class="preset-btn active" data-view="isometric">Isometric</button>
+                        <button class="preset-btn" data-view="front">Front</button>
+                        <button class="preset-btn" data-view="top">Top</button>
+                        <button class="preset-btn" data-view="side">Side</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <div class="angle-display">
+                        <span id="angleDisplay">X: 0° Y: 0° Z: 0°</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3D Canvas -->
+            <div class="canvas-3d-container">
+                <canvas id="canvas3d"></canvas>
+
+                <!-- Info Overlay -->
+                <div class="info-overlay">
+                    <div class="info-item">
+                        <span class="info-label">👆 Drag:</span>
+                        <span class="info-value">Rotate</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">🔍 Scroll:</span>
+                        <span class="info-value">Zoom</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">⌨️ R:</span>
+                        <span class="info-value">Reset</span>
+                    </div>
+                </div>
+
+                <!-- Right Control Panel -->
+                <div class="control-panel-right" id="controlPanel">
+                    <!-- Camera Section -->
+                    <div class="panel-section">
+                        <h3>📷 Camera</h3>
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span>Sensitivity</span>
+                                <span id="sensitivityValue">1.0</span>
+                            </div>
+                            <input type="range" id="sensitivitySlider" min="0.5" max="2" step="0.1" value="1">
+                        </div>
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span>Auto-rotate Speed</span>
+                                <span id="rotateSpeedValue">0</span>
+                            </div>
+                            <input type="range" id="rotateSpeedSlider" min="0" max="0.005" step="0.0005" value="0">
+                        </div>
+                        <button class="btn-primary" id="resetViewBtn" style="width: 100%; margin-top: 8px;">🔄 Reset View</button>
+                    </div>
+
+                    <!-- Display Section -->
+                    <div class="panel-section">
+                        <h3>🎨 Display</h3>
+                        <div class="color-picker-row">
+                            <label>Wall Color</label>
+                            <input type="color" id="wallColor" value="#3b82f6">
+                        </div>
+                        <div class="color-picker-row">
+                            <label>Door Color</label>
+                            <input type="color" id="doorColor" value="#ef4444">
+                        </div>
+                        <div class="color-picker-row">
+                            <label>Window Color</label>
+                            <input type="color" id="windowColor" value="#10b981">
+                        </div>
+                        <div class="color-picker-row">
+                            <label>Floor Color</label>
+                            <input type="color" id="floorColor" value="#1a1f26">
+                        </div>
+                    </div>
+
+                    <!-- Visibility Section -->
+                    <div class="panel-section">
+                        <h3>👁️ Visibility</h3>
+                        <button class="toggle-btn active" id="toggleWalls">Walls</button>
+                        <button class="toggle-btn active" id="toggleDoors">Doors</button>
+                        <button class="toggle-btn active" id="toggleWindows">Windows</button>
+                        <button class="toggle-btn active" id="toggleFloor">Floor</button>
+                        <button class="toggle-btn active" id="toggleGrid">Grid</button>
+                    </div>
+
+                    <!-- Transparency Section -->
+                    <div class="panel-section">
+                        <h3>🔍 Opacity</h3>
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span>Walls</span>
+                                <span id="wallOpacityValue">100%</span>
+                            </div>
+                            <input type="range" id="wallOpacity" min="0" max="100" value="100">
+                        </div>
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span>Doors</span>
+                                <span id="doorOpacityValue">100%</span>
+                            </div>
+                            <input type="range" id="doorOpacity" min="0" max="100" value="100">
+                        </div>
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span>Windows</span>
+                                <span id="windowOpacityValue">100%</span>
+                            </div>
+                            <input type="range" id="windowOpacity" min="0" max="100" value="100">
+                        </div>
+                    </div>
+
+                    <!-- Stats Section -->
+                    <div class="panel-section">
+                        <h3>📊 Statistics</h3>
+                        <div class="object-stats">
+                            <div class="stat-box">
+                                <div class="stat-value" id="wallCount">0</div>
+                                <div class="stat-label">Walls</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value" id="doorCount">0</div>
+                                <div class="stat-label">Doors</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value" id="windowCount">0</div>
+                                <div class="stat-label">Windows</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="help-tooltip">
+                        💡 Tip: Use arrow keys for fine rotation control. Press 'G' to toggle grid.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Controls -->
+            <div class="control-panel-bottom">
+                <button class="btn-primary" id="exportViewBtn" disabled>📷 Export View</button>
+                <button class="btn-primary" id="fullscreenBtn">🖥️ Fullscreen</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== CONFIGURATION ====================
+        const API_URL = "https://nilche111-floorplan3d-api.hf.space/predict";
+        const CLASS_COLORS_MAP = { "door": "#ef4444", "wall": "#3b82f6", "window": "#10b981" };
+
+        // ==================== GLOBAL STATE ====================
+        let uploadBtn = document.getElementById('uploadBtn');
+        let fileInput = document.getElementById('fileInput');
+        let canvas2d = document.getElementById('canvas2d');
+        let ctx2d = canvas2d.getContext('2d');
+        let placeholder = document.getElementById('placeholder');
+        let canvas3d = document.getElementById('canvas3d');
+        let ctx3d = canvas3d.getContext('2d');
+        let status = document.getElementById('status');
+
+        let processedImageData = null;
+        let detectionData = null;
+        let originalImageSize = { width: 0, height: 0 };
+        let floorColorValue = '#1a1f26';
+        let currentFile = null;
+        let currentImage = null;
+
+        // Threshold values
+        let confidenceThreshold = 0.70;
+        let detectionThreshold = 0.50;
+
+        // 3D State
+        let camera3D = {
+            rotation: { x: Math.PI - 0.5, y: 0.5, z: 0 },
+            zoom: 1,
+            sensitivity: 1,
+            autoRotateSpeed: 0,
+            isDragging: false,
+            lastMouse: { x: 0, y: 0 }
+        };
+
+        let visibility = { walls: true, doors: true, windows: true, floor: true, grid: true };
+        let opacity = { walls: 1, doors: 1, windows: 1 };
+        let colors = { wall: "#3b82f6", door: "#ef4444", window: "#10b981", floor: "#1a1f26" };
+
+        // ==================== THRESHOLD CONTROLS ====================
+        document.getElementById('confidenceSlider').addEventListener('input', (e) => {
+            confidenceThreshold = parseFloat(e.target.value);
+            document.getElementById('confidenceValue').textContent = confidenceThreshold.toFixed(2);
+        });
+
+        document.getElementById('detectionSlider').addEventListener('input', (e) => {
+            detectionThreshold = parseFloat(e.target.value);
+            document.getElementById('detectionValue').textContent = detectionThreshold.toFixed(2);
+        });
+
+        document.getElementById('reprocessBtn').addEventListener('click', async () => {
+            if (!currentFile || !currentImage) return;
+            await processImageWithAPI(currentFile, currentImage);
+        });
+
+        // ==================== INITIALIZATION ====================
+        uploadBtn.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                uploadBtn.disabled = true;
+                updateStatus("Processing image...", "loading");
+
+                const img = new Image();
+                const reader = new FileReader();
+                reader.onload = (event) => img.src = event.target.result;
+                img.onload = async () => {
+                    currentFile = file;
+                    currentImage = img;
+                    originalImageSize = { width: img.width, height: img.height };
+                    
+                    // Sample floor color
+                    const tmpCanvas = document.createElement('canvas');
+                    tmpCanvas.width = img.width;
+                    tmpCanvas.height = img.height;
+                    const tmpCtx = tmpCanvas.getContext('2d');
+                    tmpCtx.drawImage(img, 0, 0);
+                    const pixels = tmpCtx.getImageData(0, 0, img.width, img.height).data;
+                    let r = 0, g = 0, b = 0, count = 0;
+                    for (let i = 0; i < pixels.length; i += 4) {
+                        const [pr, pg, pb] = [pixels[i], pixels[i + 1], pixels[i + 2]];
+                        if (pr > 250 && pg > 250 && pb > 250) continue;
+                        r += pr; g += pg; b += pb; count++;
+                    }
+                    if (count > 0) floorColorValue = `rgb(${Math.floor(r / count)},${Math.floor(g / count)},${Math.floor(b / count)})`;
+
+                    await processImageWithAPI(file, img);
+                };
+                reader.readAsDataURL(file);
+            } catch (err) {
+                updateStatus(`Error: ${err.message}`, "error");
+                uploadBtn.disabled = false;
+            }
+        });
+
+        async function processImageWithAPI(file, img) {
+            try {
+                uploadBtn.disabled = true;
+                document.getElementById('reprocessBtn').disabled = true;
+                updateStatus("Processing with AI model...", "loading");
+
+                // Send to API with threshold parameters
+                const formData = new FormData();
+                formData.append('image', file);
+                formData.append('confidence_threshold', confidenceThreshold.toString());
+                formData.append('detection_threshold', detectionThreshold.toString());
+
+                const response = await fetch(API_URL, { method: 'POST', body: formData });
+                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                const data = await response.json();
+                processResponse(img, data);
+                updateStatus("Image processed successfully!", "success");
+                document.getElementById('reprocessBtn').disabled = false;
+            } catch (err) {
+                updateStatus(`Error: ${err.message}`, "error");
+                uploadBtn.disabled = false;
+                document.getElementById('reprocessBtn').disabled = false;
+            }
+        }
+
+        function processResponse(img, data) {
+            const maxWidth = 280, maxHeight = 280;
+            let width = img.width, height = img.height;
+            if (width > maxWidth || height > maxHeight) {
+                const ratio = Math.min(maxWidth / width, maxHeight / height);
+                width *= ratio; height *= ratio;
+            }
+            canvas2d.width = width;
+            canvas2d.height = height;
+            ctx2d.drawImage(img, 0, 0, width, height);
+
+            const scaleX = width / img.width;
+            const scaleY = height / img.height;
+
+            const images = data.images || [];
+            let detectionCount = 0;
+            detectionData = { walls: [], doors: [], windows: [], imageSize: originalImageSize };
+
+            for (const imageObj of images) {
+                const classes = imageObj.classes || [];
+                const points = imageObj.points || [];
+                for (let i = 0; i < classes.length; i++) {
+                    const cls = classes[i];
+                    const pt = points[i];
+                    if (!pt) continue;
+
+                    const x1 = pt.x1 * scaleX, y1 = pt.y1 * scaleY, x2 = pt.x2 * scaleX, y2 = pt.y2 * scaleY;
+                    const className = cls.name || "unknown";
+                    const color = CLASS_COLORS_MAP[className] || "#fbbf24";
+
+                    ctx2d.strokeStyle = color;
+                    ctx2d.lineWidth = 2;
+                    ctx2d.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+                    // Draw confidence score
+                    const confidence = cls.confidence || cls.score || 0;
+                    if (confidence > 0) {
+                        ctx2d.fillStyle = color;
+                        ctx2d.font = '10px monospace';
+                        ctx2d.fillText(`${(confidence * 100).toFixed(0)}%`, x1 + 2, y1 - 2);
+                    }
+
+                    const detection = { x1: pt.x1, y1: pt.y1, x2: pt.x2, y2: pt.y2, type: className, confidence };
+                    if (className === 'wall') detectionData.walls.push(detection);
+                    else if (className === 'door') detectionData.doors.push(detection);
+                    else if (className === 'window') detectionData.windows.push(detection);
+
+                    detectionCount++;
+                }
+            }
+
+            document.getElementById('wallCount').textContent = detectionData.walls.length;
+            document.getElementById('doorCount').textContent = detectionData.doors.length;
+            document.getElementById('windowCount').textContent = detectionData.windows.length;
+
+            canvas2d.style.display = 'block';
+            placeholder.style.display = 'none';
+            document.getElementById('copyBtn').disabled = false;
+            document.getElementById('downloadBtn').disabled = false;
+            document.getElementById('exportViewBtn').disabled = false;
+            uploadBtn.disabled = false;
+            processedImageData = canvas2d.toDataURL('image/png');
+
+            render3D();
+        }
+
+        // ==================== 2D CONTROLS ====================
+        document.getElementById('copyBtn').addEventListener('click', async () => {
+            if (!processedImageData) return;
+            try {
+                canvas2d.toBlob(async blob => {
+                    const item = new ClipboardItem({ 'image/png': blob });
+                    await navigator.clipboard.write([item]);
+                    updateStatus("Image copied!", "success");
+                });
+            } catch (err) {
+                updateStatus("Failed to copy", "error");
+            }
+        });
+
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            if (!processedImageData) return;
+            const link = document.createElement('a');
+            link.download = 'floorplan_detected.png';
+            link.href = processedImageData;
+            link.click();
+            updateStatus("Image downloaded!", "success");
+        });
+
+        // ==================== 3D RENDERING ====================
+        let animationFrameId;
+
+        function render3D() {
+            ctx3d.clearRect(0, 0, canvas3d.width, canvas3d.height);
+            
+            // Background
+            const gradient = ctx3d.createLinearGradient(0, 0, canvas3d.width, canvas3d.height);
+            gradient.addColorStop(0, '#0f1419');
+            gradient.addColorStop(1, '#1a1f26');
+            ctx3d.fillStyle = gradient;
+            ctx3d.fillRect(0, 0, canvas3d.width, canvas3d.height);
+
+            if (!detectionData) return;
+
+            // Auto-rotate
+            if (camera3D.autoRotateSpeed > 0) {
+                camera3D.rotation.y += camera3D.autoRotateSpeed;
+            }
+
+            const centerX = canvas3d.width / 2;
+            const centerY = canvas3d.height / 2;
+            const scale = Math.min(canvas3d.width, canvas3d.height) / Math.max(originalImageSize.width, originalImageSize.height) * camera3D.zoom * 0.7;
+            const wallHeight = 120;
+
+            function project(x, y, z) {
+                let y1 = y * Math.cos(camera3D.rotation.x) - z * Math.sin(camera3D.rotation.x);
+                let z1 = y * Math.sin(camera3D.rotation.x) + z * Math.cos(camera3D.rotation.x);
+                let x1 = x * Math.cos(camera3D.rotation.y) + z1 * Math.sin(camera3D.rotation.y);
+                let z2 = -x * Math.sin(camera3D.rotation.y) + z1 * Math.cos(camera3D.rotation.y);
+                const perspective = 600;
+                const factor = perspective / (perspective + z2);
+                return { x: centerX + x1 * scale * factor, y: centerY + y1 * scale * factor, z: z2 };
+            }
+
+            function drawBox(x1, y1, x2, y2, height, color, alpha) {
+                const cx = (x1 + x2) / 2 - originalImageSize.width / 2;
+                const cy = (y1 + y2) / 2 - originalImageSize.height / 2;
+                const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+
+                const corners = [
+                    project(cx - w / 2, 0, cy - h / 2),
+                    project(cx + w / 2, 0, cy - h / 2),
+                    project(cx + w / 2, 0, cy + h / 2),
+                    project(cx - w / 2, 0, cy + h / 2),
+                    project(cx - w / 2, height, cy - h / 2),
+                    project(cx + w / 2, height, cy - h / 2),
+                    project(cx + w / 2, height, cy + h / 2),
+                    project(cx - w / 2, height, cy + h / 2)
+                ];
+
+                const faces = [
+                    { points: [0, 1, 2, 3], color: color, alpha: alpha * 0.7 },
+                    { points: [4, 5, 6, 7], color: color, alpha: alpha * 0.4 },
+                    { points: [0, 1, 5, 4], color: shadeColor(color, -25), alpha: alpha * 0.85 },
+                    { points: [2, 3, 7, 6], color: shadeColor(color, -15), alpha: alpha * 0.75 },
+                    { points: [1, 2, 6, 5], color: shadeColor(color, -20), alpha: alpha * 0.8 },
+                    { points: [3, 0, 4, 7], color: shadeColor(color, -20), alpha: alpha * 0.7 }
+                ];
+
+                faces.forEach(f => {
+                    f.avgZ = f.points.reduce((s, i) => s + corners[i].z, 0) / f.points.length;
+                });
+                faces.sort((a, b) => a.avgZ - b.avgZ);
+
+                faces.forEach(f => {
+                    ctx3d.beginPath();
+                    ctx3d.moveTo(corners[f.points[0]].x, corners[f.points[0]].y);
+                    for (let i = 1; i < f.points.length; i++) {
+                        ctx3d.lineTo(corners[f.points[i]].x, corners[f.points[i]].y);
+                    }
+                    ctx3d.closePath();
+                    ctx3d.fillStyle = f.color;
+                    ctx3d.globalAlpha = f.alpha;
+                    ctx3d.fill();
+                    ctx3d.strokeStyle = shadeColor(f.color, -30);
+                    ctx3d.lineWidth = 0.5;
+                    ctx3d.stroke();
+                });
+                ctx3d.globalAlpha = 1;
+            }
+
+            function drawBoxWithOffset(x1, y1, x2, y2, startHeight, height, color, alpha) {
+                const cx = (x1 + x2) / 2 - originalImageSize.width / 2;
+                const cy = (y1 + y2) / 2 - originalImageSize.height / 2;
+                const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+
+                const corners = [
+                    project(cx - w / 2, startHeight, cy - h / 2),
+                    project(cx + w / 2, startHeight, cy - h / 2),
+                    project(cx + w / 2, startHeight, cy + h / 2),
+                    project(cx - w / 2, startHeight, cy + h / 2),
+                    project(cx - w / 2, startHeight + height, cy - h / 2),
+                    project(cx + w / 2, startHeight + height, cy - h / 2),
+                    project(cx + w / 2, startHeight + height, cy + h / 2),
+                    project(cx - w / 2, startHeight + height, cy + h / 2)
+                ];
+
+                const faces = [
+                    { points: [0, 1, 2, 3], color: color, alpha: alpha * 0.7 },
+                    { points: [4, 5, 6, 7], color: color, alpha: alpha * 0.4 },
+                    { points: [0, 1, 5, 4], color: shadeColor(color, -25), alpha: alpha * 0.85 },
+                    { points: [2, 3, 7, 6], color: shadeColor(color, -15), alpha: alpha * 0.75 },
+                    { points: [1, 2, 6, 5], color: shadeColor(color, -20), alpha: alpha * 0.8 },
+                    { points: [3, 0, 4, 7], color: shadeColor(color, -20), alpha: alpha * 0.7 }
+                ];
+
+                faces.forEach(f => {
+                    f.avgZ = f.points.reduce((s, i) => s + corners[i].z, 0) / f.points.length;
+                });
+                faces.sort((a, b) => a.avgZ - b.avgZ);
+
+                faces.forEach(f => {
+                    ctx3d.beginPath();
+                    ctx3d.moveTo(corners[f.points[0]].x, corners[f.points[0]].y);
+                    for (let i = 1; i < f.points.length; i++) {
+                        ctx3d.lineTo(corners[f.points[i]].x, corners[f.points[i]].y);
+                    }
+                    ctx3d.closePath();
+                    ctx3d.fillStyle = f.color;
+                    ctx3d.globalAlpha = f.alpha;
+                    ctx3d.fill();
+                    ctx3d.strokeStyle = shadeColor(f.color, -30);
+                    ctx3d.lineWidth = 0.5;
+                    ctx3d.stroke();
+                });
+                ctx3d.globalAlpha = 1;
+            }
+
+            function shadeColor(color, percent) {
+                let f = color.slice(4, -1).split(',');
+                let t = percent < 0 ? 0 : 255;
+                let p = Math.abs(percent) / 100;
+                let R = Math.round((t - f[0]) * p + parseInt(f[0]));
+                let G = Math.round((t - f[1]) * p + parseInt(f[1]));
+                let B = Math.round((t - f[2]) * p + parseInt(f[2]));
+                return `rgb(${R},${G},${B})`;
+            }
+
+            // Draw objects
+            if (visibility.floor) {
+                drawBox(0, 0, originalImageSize.width, originalImageSize.height, 0, colors.floor, 1);
+            }
+
+            if (visibility.walls) {
+                detectionData.walls.forEach(w => {
+                    drawBox(w.x1, w.y1, w.x2, w.y2, wallHeight, colors.wall, opacity.walls);
+                });
+            }
+
+            if (visibility.doors) {
+                detectionData.doors.forEach(d => {
+                    // Expand slightly to eliminate gaps with adjacent walls
+                    const gap = 2; // pixels
+                    const expandedX1 = d.x1 - gap;
+                    const expandedY1 = d.y1 - gap;
+                    const expandedX2 = d.x2 + gap;
+                    const expandedY2 = d.y2 + gap;
+
+                    const doorHeight = wallHeight * 0.7;  // Door occupies 70% of wall height
+                    const wallAboveDoorHeight = wallHeight * 0.3;  // Wall above door is 30%
+
+                    // Draw door (expanded to cover gaps)
+                    drawBox(expandedX1, expandedY1, expandedX2, expandedY2, doorHeight, colors.door, opacity.doors);
+
+                    // Draw wall above door (expanded to cover gaps)
+                    drawBoxWithOffset(expandedX1, expandedY1, expandedX2, expandedY2, doorHeight, wallAboveDoorHeight, colors.wall, opacity.walls * 0.9);
+                });
+            }
+
+            if (visibility.windows) {
+                detectionData.windows.forEach(w => {
+                    // Expand slightly to eliminate gaps with adjacent walls
+                    const gap = 2; // pixels
+                    const expandedX1 = w.x1 - gap;
+                    const expandedY1 = w.y1 - gap;
+                    const expandedX2 = w.x2 + gap;
+                    const expandedY2 = w.y2 + gap;
+
+                    const windowHeight = wallHeight * 0.35;  // Window occupies 35% of wall height
+                    const windowBottomOffset = wallHeight * 0.35;  // Window starts at 35% from bottom
+                    const wallBelowWindowHeight = windowBottomOffset;  // Wall below window
+                    const wallAboveWindowHeight = wallHeight * 0.3;  // Wall above window is 30%
+
+                    // Draw wall below window (expanded)
+                    drawBox(expandedX1, expandedY1, expandedX2, expandedY2, wallBelowWindowHeight, colors.wall, opacity.walls * 0.9);
+
+                    // Draw window (expanded)
+                    drawBoxWithOffset(expandedX1, expandedY1, expandedX2, expandedY2, wallBelowWindowHeight, windowHeight, colors.window, opacity.windows);
+
+                    // Draw wall above window (expanded)
+                    drawBoxWithOffset(expandedX1, expandedY1, expandedX2, expandedY2, wallBelowWindowHeight + windowHeight, wallAboveWindowHeight, colors.wall, opacity.walls * 0.9);
+                });
+            }
+
+            // Update angle display
+            document.getElementById('angleDisplay').textContent = 
+                `X: ${Math.round(camera3D.rotation.x * 180 / Math.PI)}° Y: ${Math.round(camera3D.rotation.y * 180 / Math.PI)}° Z: ${Math.round(camera3D.rotation.z * 180 / Math.PI)}°`;
+
+            animationFrameId = requestAnimationFrame(render3D);
+        }
+
+        // ==================== 3D CONTROLS ====================
+        canvas3d.addEventListener('mousedown', (e) => {
+            camera3D.isDragging = true;
+            camera3D.lastMouse = { x: e.clientX, y: e.clientY };
+        });
+
+        canvas3d.addEventListener('mousemove', (e) => {
+            if (!camera3D.isDragging) return;
+            const dx = (e.clientX - camera3D.lastMouse.x) * 0.01 * camera3D.sensitivity;
+            const dy = (e.clientY - camera3D.lastMouse.y) * 0.01 * camera3D.sensitivity;
+            camera3D.rotation.y -= dx;
+            camera3D.rotation.x += dy;
+            camera3D.lastMouse = { x: e.clientX, y: e.clientY };
+        });
+
+        canvas3d.addEventListener('mouseup', () => {
+            camera3D.isDragging = false;
+        });
+
+        canvas3d.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            camera3D.zoom *= 1 - e.deltaY * 0.001;
+            camera3D.zoom = Math.max(0.5, Math.min(3, camera3D.zoom));
+        });
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            const step = 0.1 * camera3D.sensitivity;
+            if (e.key === 'ArrowUp') camera3D.rotation.x += step;
+            if (e.key === 'ArrowDown') camera3D.rotation.x -= step;
+            if (e.key === 'ArrowLeft') camera3D.rotation.y -= step;
+            if (e.key === 'ArrowRight') camera3D.rotation.y += step;
+            if (e.key === 'r' || e.key === 'R') resetView();
+            if (e.key === 'g' || e.key === 'G') toggleVisibility('grid');
+        });
+
+        // Preset views
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                const view = btn.dataset.view;
+                switch(view) {
+                    case 'front':
+                        camera3D.rotation = { x: Math.PI, y: 0, z: 0 };
+                        break;
+                    case 'top':
+                        camera3D.rotation = { x: Math.PI * 1.5, y: 0, z: 0 };
+                        break;
+                    case 'side':
+                        camera3D.rotation = { x: Math.PI - 0.3, y: Math.PI / 2, z: 0 };
+                        break;
+                    case 'isometric':
+                    default:
+                        camera3D.rotation = { x: Math.PI - 0.5, y: 0.5, z: 0 };
+                }
+            });
+        });
+
+        // Right panel controls
+        document.getElementById('sensitivitySlider').addEventListener('input', (e) => {
+            camera3D.sensitivity = parseFloat(e.target.value);
+            document.getElementById('sensitivityValue').textContent = e.target.value;
+        });
+
+        document.getElementById('rotateSpeedSlider').addEventListener('input', (e) => {
+            camera3D.autoRotateSpeed = parseFloat(e.target.value);
+            document.getElementById('rotateSpeedValue').textContent = e.target.value;
+        });
+
+        document.getElementById('resetViewBtn').addEventListener('click', resetView);
+
+        function resetView() {
+            camera3D.rotation = { x: Math.PI - 0.5, y: 0.5, z: 0 };
+            camera3D.zoom = 1;
+        }
+
+        // Color pickers
+        document.getElementById('wallColor').addEventListener('change', (e) => {
+            colors.wall = e.target.value;
+        });
+        document.getElementById('doorColor').addEventListener('change', (e) => {
+            colors.door = e.target.value;
+        });
+        document.getElementById('windowColor').addEventListener('change', (e) => {
+            colors.window = e.target.value;
+        });
+        document.getElementById('floorColor').addEventListener('change', (e) => {
+            colors.floor = e.target.value;
+        });
+
+        // Visibility toggles
+        ['walls', 'doors', 'windows', 'floor', 'grid'].forEach(type => {
+            document.getElementById(`toggle${type.charAt(0).toUpperCase() + type.slice(1)}`).addEventListener('click', function() {
+                toggleVisibility(type);
+                this.classList.toggle('active');
+            });
+        });
+
+        function toggleVisibility(type) {
+            visibility[type] = !visibility[type];
+        }
+
+        // Opacity sliders
+        document.getElementById('wallOpacity').addEventListener('input', (e) => {
+            opacity.walls = parseInt(e.target.value) / 100;
+            document.getElementById('wallOpacityValue').textContent = e.target.value + '%';
+        });
+
+        document.getElementById('doorOpacity').addEventListener('input', (e) => {
+            opacity.doors = parseInt(e.target.value) / 100;
+            document.getElementById('doorOpacityValue').textContent = e.target.value + '%';
+        });
+
+        document.getElementById('windowOpacity').addEventListener('input', (e) => {
+            opacity.windows = parseInt(e.target.value) / 100;
+            document.getElementById('windowOpacityValue').textContent = e.target.value + '%';
+        });
+
+        // Export view
+        document.getElementById('exportViewBtn').addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'floorplan_3d_view.png';
+            link.href = canvas3d.toDataURL('image/png');
+            link.click();
+            updateStatus("3D view exported!", "success");
+        });
+
+        // Fullscreen
+        document.getElementById('fullscreenBtn').addEventListener('click', () => {
+            const container = document.querySelector('.section-3d');
+            if (!document.fullscreenElement) {
+                container.requestFullscreen().catch(err => console.log(err));
+            } else {
+                document.exitFullscreen();
+            }
+        });
+
+        // ==================== UTILITIES ====================
+        function updateStatus(message, type) {
+            status.textContent = message;
+            status.className = `status ${type}`;
+            if (type === 'success' || type === 'error') {
+                setTimeout(() => { status.textContent = ''; status.className = 'status'; }, 3000);
+            }
+        }
+
+        // Responsive canvas sizing
+        function resizeCanvas() {
+            canvas3d.width = canvas3d.parentElement.clientWidth;
+            canvas3d.height = canvas3d.parentElement.clientHeight;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Start rendering
+        render3D();
+    </script>
+</body>
+</html>
