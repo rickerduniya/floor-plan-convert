@@ -1140,6 +1140,53 @@
                 ctx3d.globalAlpha = 1;
             }
 
+            function drawBoxWithOffset(x1, y1, x2, y2, startHeight, height, color, alpha) {
+                const cx = (x1 + x2) / 2 - originalImageSize.width / 2;
+                const cy = (y1 + y2) / 2 - originalImageSize.height / 2;
+                const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+
+                const corners = [
+                    project(cx - w / 2, startHeight, cy - h / 2),
+                    project(cx + w / 2, startHeight, cy - h / 2),
+                    project(cx + w / 2, startHeight, cy + h / 2),
+                    project(cx - w / 2, startHeight, cy + h / 2),
+                    project(cx - w / 2, startHeight + height, cy - h / 2),
+                    project(cx + w / 2, startHeight + height, cy - h / 2),
+                    project(cx + w / 2, startHeight + height, cy + h / 2),
+                    project(cx - w / 2, startHeight + height, cy + h / 2)
+                ];
+
+                const faces = [
+                    { points: [0, 1, 2, 3], color: color, alpha: alpha * 0.7 },
+                    { points: [4, 5, 6, 7], color: color, alpha: alpha * 0.4 },
+                    { points: [0, 1, 5, 4], color: shadeColor(color, -25), alpha: alpha * 0.85 },
+                    { points: [2, 3, 7, 6], color: shadeColor(color, -15), alpha: alpha * 0.75 },
+                    { points: [1, 2, 6, 5], color: shadeColor(color, -20), alpha: alpha * 0.8 },
+                    { points: [3, 0, 4, 7], color: shadeColor(color, -20), alpha: alpha * 0.7 }
+                ];
+
+                faces.forEach(f => {
+                    f.avgZ = f.points.reduce((s, i) => s + corners[i].z, 0) / f.points.length;
+                });
+                faces.sort((a, b) => a.avgZ - b.avgZ);
+
+                faces.forEach(f => {
+                    ctx3d.beginPath();
+                    ctx3d.moveTo(corners[f.points[0]].x, corners[f.points[0]].y);
+                    for (let i = 1; i < f.points.length; i++) {
+                        ctx3d.lineTo(corners[f.points[i]].x, corners[f.points[i]].y);
+                    }
+                    ctx3d.closePath();
+                    ctx3d.fillStyle = f.color;
+                    ctx3d.globalAlpha = f.alpha;
+                    ctx3d.fill();
+                    ctx3d.strokeStyle = shadeColor(f.color, -30);
+                    ctx3d.lineWidth = 0.5;
+                    ctx3d.stroke();
+                });
+                ctx3d.globalAlpha = 1;
+            }
+
             function shadeColor(color, percent) {
                 let f = color.slice(4, -1).split(',');
                 let t = percent < 0 ? 0 : 255;
@@ -1163,13 +1210,46 @@
 
             if (visibility.doors) {
                 detectionData.doors.forEach(d => {
-                    drawBox(d.x1, d.y1, d.x2, d.y2, wallHeight * 0.8, colors.door, opacity.doors);
+                    // Expand slightly to eliminate gaps with adjacent walls
+                    const gap = 2; // pixels
+                    const expandedX1 = d.x1 - gap;
+                    const expandedY1 = d.y1 - gap;
+                    const expandedX2 = d.x2 + gap;
+                    const expandedY2 = d.y2 + gap;
+
+                    const doorHeight = wallHeight * 0.7;  // Door occupies 70% of wall height
+                    const wallAboveDoorHeight = wallHeight * 0.3;  // Wall above door is 30%
+
+                    // Draw door (expanded to cover gaps)
+                    drawBox(expandedX1, expandedY1, expandedX2, expandedY2, doorHeight, colors.door, opacity.doors);
+
+                    // Draw wall above door (expanded to cover gaps)
+                    drawBoxWithOffset(expandedX1, expandedY1, expandedX2, expandedY2, doorHeight, wallAboveDoorHeight, colors.wall, opacity.walls * 0.9);
                 });
             }
 
             if (visibility.windows) {
                 detectionData.windows.forEach(w => {
-                    drawBox(w.x1, w.y1, w.x2, w.y2, wallHeight * 0.4, colors.window, opacity.windows);
+                    // Expand slightly to eliminate gaps with adjacent walls
+                    const gap = 2; // pixels
+                    const expandedX1 = w.x1 - gap;
+                    const expandedY1 = w.y1 - gap;
+                    const expandedX2 = w.x2 + gap;
+                    const expandedY2 = w.y2 + gap;
+
+                    const windowHeight = wallHeight * 0.35;  // Window occupies 35% of wall height
+                    const windowBottomOffset = wallHeight * 0.35;  // Window starts at 35% from bottom
+                    const wallBelowWindowHeight = windowBottomOffset;  // Wall below window
+                    const wallAboveWindowHeight = wallHeight * 0.3;  // Wall above window is 30%
+
+                    // Draw wall below window (expanded)
+                    drawBox(expandedX1, expandedY1, expandedX2, expandedY2, wallBelowWindowHeight, colors.wall, opacity.walls * 0.9);
+
+                    // Draw window (expanded)
+                    drawBoxWithOffset(expandedX1, expandedY1, expandedX2, expandedY2, wallBelowWindowHeight, windowHeight, colors.window, opacity.windows);
+
+                    // Draw wall above window (expanded)
+                    drawBoxWithOffset(expandedX1, expandedY1, expandedX2, expandedY2, wallBelowWindowHeight + windowHeight, wallAboveWindowHeight, colors.wall, opacity.walls * 0.9);
                 });
             }
 
